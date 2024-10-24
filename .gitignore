@@ -1,1 +1,7 @@
+# yuque file
+*.lakebook
+# output file
 out
+lakebook_*
+# some ide's config
+.idea

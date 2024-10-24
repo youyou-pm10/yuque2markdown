@@ -9,10 +9,9 @@ import argparse
 import tarfile
 from markdownify import markdownify as md
 from bs4 import BeautifulSoup
-from requests import get
+from requests import get, RequestException
 
 import yaml
-
 
 TYPE_TITLE = "TITLE"
 TYPE_DOC = "DOC"
@@ -109,6 +108,31 @@ def is_valid_url(url):
     return bool(re.match(pattern, url))
 
 
+def fetch_image_url(image_url, retries=5):
+    """
+    Fetches the content of an image URL using GET request.
+
+    Args:
+    image_url (str): The URL of the image to fetch.
+    retries (int): Number of times to retry on failure.
+
+    Returns:
+    requests.Response or None: The response object if successful, None otherwise.
+    """
+    for attempt in range(retries + 1):
+        try:
+            resp = get(image_url)
+            resp.raise_for_status()  # Raises stored HTTPError, if one occurred
+            return resp
+        except RequestException as e:
+            if attempt == retries:
+                print(f"\033[31mFailed to fetch {image_url} after {retries + 1} attempts.\033[0m")
+                return None
+            else:
+                print(f"\033[31mAttempt {attempt + 1} failed, retrying... ({e})\033[0m")
+                continue
+
+
 def download_images_and_patch_html(output_dir_path, sanitized_title, html):
     bs = BeautifulSoup(html, "html.parser")
     if len(bs.find_all("img")) > 0:
@@ -122,7 +146,7 @@ def download_images_and_patch_html(output_dir_path, sanitized_title, html):
             if not is_valid_url(image["src"]):
                 print("\033[31mDocx '%s' has a wrong img path, check it!\033[0m" % sanitized_title)
                 continue
-            resp = get(image["src"])
+            resp = fetch_image_url(image["src"])
             file_name = sanitized_title + "_%03d%s" % (
                 no,
                 content_type_to_extension.get(resp.headers["Content-Type"], ""),
